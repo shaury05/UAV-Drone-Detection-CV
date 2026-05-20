@@ -1,30 +1,44 @@
-# UAV Drone Detection and Tracking
+# 🚁 Autonomous UAV Drone Detection & Predictive Tracking
 
-## Overview
-This project detects and tracks UAV drones in video footage using a deep learning object detector (YOLOv8) and a Kalman filter for multi-object tracking (MOT). 
+[![Python](https://img.shields.io/badge/Python-3.10-blue.svg)](https://www.python.org/)
+[![YOLOv8](https://img.shields.io/badge/YOLOv8-Computer_Vision-yellow.svg)](https://ultralytics.com/)
+[![Hugging Face](https://img.shields.io/badge/Hugging_Face-Dataset_Hosted-orange.svg)](https://huggingface.co/)
+[![Docker](https://img.shields.io/badge/Docker-Containerized-blue.svg)](https://www.docker.com/)
 
-## Links
-* **Hugging Face Dataset (Parquet)**: [Shauryaaa05/uav-drone-detections](https://huggingface.co/datasets/Shauryaaa05/uav-drone-detections)
-* **Tracked Video 1**: [Watch on YouTube](https://youtu.be/iDUc0NynjV8)
-* **Tracked Video 2**: [Watch on YouTube](https://youtu.be/TnZkiKwXTbY)
+## 🚀 The Vision
+Unstructured video footage is messy. This project is an end-to-end Computer Vision and Data Engineering pipeline built to ingest raw, noisy video streams and extract clean, actionable trajectory data. By combining deep learning object detection with probabilistic kinetic tracking, this system autonomously finds and tracks Unmanned Aerial Vehicles (UAVs)—even when they are tiny, distant, or temporarily hidden by clouds.
 
-## Task 1: Dataset Choice and Detector Configuration
-While researching datasets, I evaluated the **VisDrone** dataset and **Roboflow Universe Drone Detection** datasets, which provide excellent bounding box labels for aerial targets. However, because the assignment states that fine-tuning is encouraged but not required, I opted to configure a pre-trained **Ultralytics YOLOv8s** model. Because standard COCO does not have a "drone" class, YOLOv8 frequently classifies distant drones as birds (class 14), airplanes (class 16), or kites (class 17). The detection script filters the inference results for these specific classes to successfully identify the UAV. Frames containing detections were cropped and saved to generate the sample dataset.
+### 🎥 Live Demonstrations & Data
+* **[View the Tracked Video 1](https://youtu.be/iDUc0NynjV8)** (YouTube)
+* **[View the Tracked Video 2](https://youtu.be/TnZkiKwXTbY)** (YouTube)
+* **[Explore the Extracted Dataset](https://huggingface.co/datasets/Shauryaaa05/uav-drone-detections)** (Hosted on Hugging Face in optimized Parquet format)
 
-## Task 2: Kalman Filter State Design and Noise Parameters
-I implemented a Kalman filter using the `filterpy` library to track the drone's 2D trajectory. 
-* **State Vector**: The state vector is 4-dimensional: `[x, y, dx, dy]`, representing the 2D pixel coordinates of the bounding box center (`x`, `y`) and their respective velocities (`dx`, `dy`).
-* **State Transition**: Modeled using a constant velocity kinematic model.
-* **Measurement Vector**: 2-dimensional `[x, y]` provided by the YOLOv8 detector.
-* **Noise Parameters**: 
-  * Initial uncertainty (`P`) was scaled by 1000.
-  * Measurement noise (`R`) was set to 50 for both x and y to account for bounding box jitter.
-  * Process noise (`Q`) was generated using `Q_discrete_white_noise` with a variance of 0.1, allowing the filter to adapt to smooth changes in velocity.
+---
 
-## Failure Cases and Handling Missed Detections
-**Failure Cases**: The YOLO detector occasionally misses the drone, especially when it shrinks to a very small pixel size in the distance or blends into dark backgrounds like trees.
+## 🛠️ Tech Stack
+* **AI & Computer Vision:** Ultralytics YOLOv8, OpenCV, FilterPy (Kalman Filters)
+* **Data Engineering & Processing:** Hugging Face `datasets`, FFMPEG, Pandas, Apache Parquet
+* **Environment & DevOps:** Docker, Git
 
-**Handling Missed Detections**: The Kalman filter is designed to handle temporary detection failures. If the YOLO detector fails to find the drone in a frame, the tracker skips the `update()` step and only runs the `predict()` step. This allows the tracker to "guess" the drone's location based on its last known velocity. 
-* The tracker is configured with a `max_missed` threshold of 5 frames. 
-* If the drone is missing for fewer than 5 frames, a red bounding box is drawn to indicate a predicted state. 
-* If it exceeds 5 consecutive missed frames, the tracker deactivates until the drone is detected again.
+---
+
+## 🧠 Engineering Architecture: How It Works
+
+### 1. Robust Data Ingestion
+The pipeline processes raw `.mp4` video files, isolating individual frames using `ffmpeg` within an entirely containerized **Docker** environment. This guarantees dependency consistency, meaning the pipeline will run flawlessly on any machine without local environment conflicts.
+
+### 2. Deep Learning Detection (Finding the Needle in the Haystack)
+The system leverages the **YOLOv8s** architecture. Because standard COCO weights lack a dedicated "drone" class, the inference script dynamically filters and remaps spatially similar classes (like birds, distant airplanes, and kites). This engineering decision allows the pre-trained model to successfully identify distant UAVs against complex, moving backgrounds without requiring a massive, computationally expensive fine-tuning phase.
+
+### 3. Predictive Tracking (When the AI goes blind)
+**The Problem:** Deep learning detectors fail. If a drone shrinks to a few pixels, enters a shadow, or flies behind a tree, YOLO drops the bounding box.
+**The Solution:** I engineered a 4D **Kalman Filter** `[x, y, dx, dy]` utilizing a constant velocity kinematic model to track the drone's trajectory. 
+* When the AI successfully detects the drone, the Kalman Filter *updates* its tracking logic (visualized as a **Green** bounding box).
+* When the AI drops the frame (occlusion), the tracker seamlessly steps in to *predict* the drone's location based on its last known velocity vector (visualized as a **Red** bounding box). 
+* A memory threshold prevents false-positive drift, terminating the track if the target is lost for more than 5 consecutive frames.
+
+### 4. Cloud Deployment & Data Structuring
+The final, verified detections are not just left on a local hard drive. The pipeline automatically aggregates the visual data, converts it into a highly efficient, query-ready **Apache Parquet** format, and programmatically pushes it to the **Hugging Face Hub**. 
+
+---
+*Designed and engineered by Shaury Pratap Singh.*
